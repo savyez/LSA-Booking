@@ -126,3 +126,7 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+PAYMENT_GATEWAY_URL = (
+    "http://127.0.0.1:8000/api/v1/payments/mock-gateway/"
+)
