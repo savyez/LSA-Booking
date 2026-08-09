@@ -1,7 +1,7 @@
 import uuid
 from .models import Payment
-from rest_framework import status
 from django.db import transaction
+from rest_framework import status
 from bookings.models import Booking
 from rest_framework.views import APIView
 from .serializers import PaymentSerializer
@@ -17,7 +17,6 @@ class PaymentView(APIView):
     def post(self, request):
 
         booking_id = request.data.get("booking")
-
         if not booking_id:
             return Response(
                 {
@@ -48,12 +47,10 @@ class PaymentView(APIView):
                         },
                         status=status.HTTP_409_CONFLICT,
                     )
-
                 payment = Payment.objects.create(
                     booking=booking,
                     amount=booking.lsa.hourly_rate,
                 )
-
         except Booking.DoesNotExist:
             return Response(
                 {
@@ -66,7 +63,6 @@ class PaymentView(APIView):
 
         try:
             gateway_response = process_payment(payment)
-
         except PaymentGatewayError:
             return Response(
                 {
@@ -89,7 +85,6 @@ class MockPaymentGatewayView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-
         payment_id = request.data.get("payment_id")
         amount = request.data.get("amount")
         simulate_status = request.data.get(
@@ -106,7 +101,6 @@ class MockPaymentGatewayView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if not amount:
             return Response(
                 {
@@ -116,7 +110,6 @@ class MockPaymentGatewayView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if simulate_status not in [
             Payment.Status.SUCCESS,
             Payment.Status.FAILED,
@@ -129,9 +122,7 @@ class MockPaymentGatewayView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         transaction_id = str(uuid.uuid4())
-
         return Response(
             {
                 "transaction_id": transaction_id,
@@ -145,11 +136,9 @@ class PaymentWebhookView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-
         payment_id = request.data.get("payment_id")
         transaction_id = request.data.get("transaction_id")
         payment_status = request.data.get("status")
-
         if not payment_id:
             return Response(
                 {
@@ -159,7 +148,6 @@ class PaymentWebhookView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if not transaction_id:
             return Response(
                 {
@@ -169,7 +157,6 @@ class PaymentWebhookView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if payment_status not in [
             Payment.Status.SUCCESS,
             Payment.Status.FAILED,
@@ -182,9 +169,8 @@ class PaymentWebhookView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
         try:
-
             with transaction.atomic():
 
                 payment = (
@@ -193,9 +179,7 @@ class PaymentWebhookView(APIView):
                     .select_related("booking")
                     .get(pk=payment_id)
                 )
-
-                # Ignore duplicate webhook notifications.
-                if payment.status != Payment.Status.PENDING:
+                if payment.status != Payment.Status.PENDING:            # Ignore duplicate webhook notifications.
                     return Response(
                         {
                             "message": "Payment has already been processed."
@@ -213,22 +197,17 @@ class PaymentWebhookView(APIView):
                         "updated_at",
                     ]
                 )
-
                 booking = payment.booking
-
                 if payment_status == Payment.Status.SUCCESS:
                     booking.status = Booking.Status.CONFIRMED
-
                 else:
                     booking.status = Booking.Status.PAYMENT_FAILED
-
                 booking.save(
                     update_fields=[
                         "status",
                         "updated_at",
                     ]
                 )
-
         except Payment.DoesNotExist:
             return Response(
                 {
@@ -238,7 +217,7 @@ class PaymentWebhookView(APIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
-
+        
         return Response(
             {
                 "message": "Payment webhook processed successfully.",
