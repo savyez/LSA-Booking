@@ -1,6 +1,10 @@
 import logging
+from urllib.parse import urlparse
 import requests
 from django.conf import settings
+from django.urls import resolve, Resolver404
+from rest_framework import status as drf_status
+from rest_framework.test import APIRequestFactory
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,37 @@ def process_payment(payment):
         "PAYMENT_GATEWAY_URL",
         "http://127.0.0.1:8000/api/v1/payments/mock-gateway/",
     )
+
+    parsed = urlparse(gateway_url)
+    is_local = (
+        not parsed.netloc or
+        parsed.hostname in ("127.0.0.1", "localhost", "testserver")
+    )
+
+    if is_local:
+        try:
+            match = resolve(parsed.path)
+            factory = APIRequestFactory()
+            request = factory.post(parsed.path, payload, format="json")
+            response = match.func(request, *match.args, **match.kwargs)
+            if drf_status.is_success(response.status_code):
+                return response.data
+            else:
+                raise PaymentGatewayError(
+                    f"Payment gateway returned status {response.status_code}."
+                )
+        except Resolver404:
+            pass
+        except PaymentGatewayError:
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Internal payment gateway call failed for payment %s.",
+                payment.id,
+            )
+            raise PaymentGatewayError(
+                "Payment gateway request failed."
+            ) from exc
 
     try:
         response = requests.post(

@@ -1,6 +1,6 @@
 import uuid
 from .models import Payment
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from bookings.models import Booking
 from rest_framework.views import APIView
@@ -49,8 +49,9 @@ class PaymentView(APIView):
                     )
                 payment = Payment.objects.create(
                     booking=booking,
-                    amount=booking.lsa.hourly_rate,
+                    amount=booking.total_amount,
                 )
+                gateway_response = process_payment(payment)
         except Booking.DoesNotExist:
             return Response(
                 {
@@ -60,9 +61,6 @@ class PaymentView(APIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
-
-        try:
-            gateway_response = process_payment(payment)
         except PaymentGatewayError:
             return Response(
                 {
@@ -187,6 +185,16 @@ class PaymentWebhookView(APIView):
                         status=status.HTTP_200_OK,
                     )
 
+                if Payment.objects.filter(transaction_id=transaction_id).exclude(pk=payment_id).exists():
+                    return Response(
+                        {
+                            "transaction_id": [
+                                "A payment with this transaction ID already exists."
+                            ]
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 payment.transaction_id = transaction_id
                 payment.status = payment_status
 
@@ -216,6 +224,15 @@ class PaymentWebhookView(APIView):
                     ]
                 },
                 status=status.HTTP_404_NOT_FOUND,
+            )
+        except IntegrityError:
+            return Response(
+                {
+                    "transaction_id": [
+                        "A payment with this transaction ID already exists."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         
         return Response(

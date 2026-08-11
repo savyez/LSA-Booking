@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
 import uuid
@@ -88,6 +90,21 @@ class Booking(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+    @property
+    def duration_hours(self):
+        if not (self.booking_date and self.start_time and self.end_time):
+            return Decimal("0.00")
+        start_dt = datetime.combine(self.booking_date, self.start_time)
+        end_dt = datetime.combine(self.booking_date, self.end_time)
+        seconds = (end_dt - start_dt).total_seconds()
+        return Decimal(str(seconds / 3600))
+
+    @property
+    def total_amount(self):
+        if not hasattr(self, "lsa") or self.lsa is None:
+            return Decimal("0.00")
+        return (self.lsa.hourly_rate * self.duration_hours).quantize(Decimal("0.01"))
 
     def __str__(self):
         return (
