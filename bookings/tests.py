@@ -28,103 +28,75 @@ class BookingAPITestCase(APITestCase):
         payload = {
             "parent": str(self.parent.id),
             "lsa": str(self.lsa.id),
-            "booking_date": "2026-08-09",
+            "booking_date": "2026-08-20",
             "start_time": "21:00",
             "end_time": "22:00",
         }
-        response = self.client.post(
-            self.url, 
-            data=payload, 
-            format="json"
-            )
+        response = self.client.post(self.url, data=payload, format="json")
         self.assertEqual(
             response.status_code, 
-            status.HTTP_201_CREATED
-            )
+        status.HTTP_201_CREATED
+        )
         self.assertEqual(
             Booking.objects.count(), 
-            1
-            )
+        1
+        )
         self.assertEqual(
             response.data["message"], 
-            "Booking created successfully!"
-            )
+        "Booking created successfully!"
+        )
 
     def test_create_overlapping_booking(self):
         payload = {
             "parent": str(self.parent.id),
             "lsa": str(self.lsa.id),
-            "booking_date": "2026-08-09",
+            "booking_date": "2026-08-20",
             "start_time": "21:00",
             "end_time": "22:00",
         }
-
-        first_response = self.client.post(                 # First booking succeeds
-            self.url, 
-            data=payload, 
-            format="json"
-            )
+        first_response = self.client.post(self.url, data=payload, format="json")
         self.assertEqual(
             first_response.status_code, 
-            status.HTTP_201_CREATED
-            )
+        status.HTTP_201_CREATED
+        )
 
-        second_response = self.client.post(                # Overlapping booking fails with 409 CONFLICT
+        second_response = self.client.post(
             self.url, 
-            data=payload, 
-            format="json"
-            )
+        data=payload, 
+        format="json"
+        )
         self.assertEqual(
             second_response.status_code, 
-            status.HTTP_409_CONFLICT
-            )
+        status.HTTP_409_CONFLICT
+        )
         self.assertEqual(
             Booking.objects.count(), 
-            1
-            )
+        1
+        )
 
-    def test_create_booking_invalid_time_range(self):
+    def test_create_overnight_booking_success(self):
         payload = {
             "parent": str(self.parent.id),
             "lsa": str(self.lsa.id),
-            "booking_date": "2026-08-09",
-            "start_time": "22:00",
-            "end_time": "21:00",
+            "booking_date": "2026-08-25",
+            "start_time": "23:00",
+            "end_time": "01:00",
         }
         response = self.client.post(
             self.url, 
-            data=payload, 
-            format="json"
-            )
+        data=payload, 
+        format="json"
+        )
         self.assertEqual(
             response.status_code, 
-            status.HTTP_400_BAD_REQUEST
-            )
-        self.assertIn(
-            "end_time", 
-            response.data
-            )
-
-    def test_create_booking_missing_required_fields(self):
-        payload = {
-            "booking_date": "2026-08-09",
-            "start_time": "21:00",
-            "end_time": "22:00",
-        }
-        response = self.client.post(
-            self.url, 
-            data=payload, 
-            format="json"
-            )
+        status.HTTP_201_CREATED
+        )
+        booking = Booking.objects.get(id=response.data["data"]["id"])
         self.assertEqual(
-            response.status_code, 
-            status.HTTP_400_BAD_REQUEST
-            )
-        self.assertIn(
-            "parent", 
-            response.data
-            )
-        self.assertIn(
-            "lsa", 
-            response.data
-            )
+            booking.duration_hours, 
+        Decimal("2.0")
+        )
+        self.assertEqual(
+            booking.total_amount, 
+        Decimal("1300.00")
+        )

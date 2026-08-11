@@ -23,6 +23,8 @@ class ParentSerializer(serializers.ModelSerializer):
         ]
 
 class LSAProfileSerializer(serializers.ModelSerializer):
+    skills = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = LSAProfile
         fields = [
@@ -42,3 +44,23 @@ class LSAProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        skill_names = [skill.name for skill in instance.skills.all()]
+        ret["skills"] = ", ".join(skill_names)
+        return ret
+
+    def create(self, validated_data):
+        skills_raw = validated_data.pop("skills", None)
+        profile = super().create(validated_data)
+        if skills_raw is not None:
+            profile.set_skills(skills_raw)
+        return profile
+
+    def update(self, instance, validated_data):
+        skills_raw = validated_data.pop("skills", None)
+        profile = super().update(instance, validated_data)
+        if skills_raw is not None:
+            profile.set_skills(skills_raw)
+        return profile

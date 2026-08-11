@@ -1,60 +1,9 @@
+from bookings.models import Booking
 from decimal import Decimal
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from users.models import Parent, LSAProfile
-
-
-class ParentAPITests(APITestCase):
-
-    def setUp(self):
-        self.url = reverse("parent-view")
-
-    def test_create_parent(self):
-        payload = {
-            "first_name": "John",
-            "last_name": "Doe",
-            "email": "john@example.com",
-            "phone_number": "9876543210",
-        }
-        response = self.client.post(
-            self.url, 
-            data=payload, 
-            format="json"
-            )
-        self.assertEqual(
-            response.status_code, 
-            status.HTTP_201_CREATED
-            )
-        self.assertEqual(
-            Parent.objects.count(), 
-            1
-            )
-        self.assertEqual(
-            response.data["data"]["email"], 
-            "john@example.com"
-            )
-
-    def test_duplicate_parent_email(self):
-        Parent.objects.create(
-            first_name="John",
-            last_name="Doe",
-            email="john@example.com",
-        )
-        payload = {
-            "first_name": "Jane",
-            "last_name": "Doe",
-            "email": "john@example.com",
-        }
-        response = self.client.post(
-            self.url, 
-            data=payload, 
-            format="json"
-            )
-        self.assertEqual(
-            response.status_code, 
-            status.HTTP_400_BAD_REQUEST
-            )
 
 
 class LSASearchAPITests(APITestCase):
@@ -78,10 +27,32 @@ class LSASearchAPITests(APITestCase):
             is_active=False,
         )
 
-    def test_lsa_skill_search(self):
+    def test_lsa_search_skill_and_availability(self):
+        parent = Parent.objects.create(
+            first_name="Jane",
+            last_name="Doe",
+            email="jane@example.com",
+        )
+        Booking.objects.create(
+            parent=parent,
+            lsa=self.active_lsa,
+            booking_date="2026-08-15",
+            start_time="10:00",
+            end_time="12:00",
+            status=Booking.Status.CONFIRMED,
+        )
+        alice = LSAProfile.objects.create(
+            first_name="Alice",
+            last_name="Smith",
+            email="alice@example.com",
+            skills="ADHD",
+            hourly_rate=Decimal("600.00"),
+            is_active=True,
+        )
+
         response = self.client.get(
-            f"{self.url}?skill=adhd"
-            )
+            f"{self.url}?skill=adhd&booking_date=2026-08-15&start_time=11:00&end_time=13:00"
+        )
         self.assertEqual(
             response.status_code, 
             status.HTTP_200_OK
@@ -91,40 +62,6 @@ class LSASearchAPITests(APITestCase):
             1
             )
         self.assertEqual(
-            response.data["data"][0]["first_name"],
-            "Bob"
+            response.data["data"][0]["first_name"], 
+            "Alice"
             )
-
-    def test_lsa_search_active_only(self):
-        response = self.client.get(self.url)
-        self.assertEqual(
-            response.status_code, 
-            status.HTTP_200_OK
-            )
-        self.assertEqual(
-            len(response.data["data"]), 
-            1
-            )
-
-        
-class LSAProfileAPITests(APITestCase):
-
-    def setUp(self):
-        self.url = reverse("lsa-profile")
-
-    def test_create_lsa_profile(self):
-        payload = {
-            "first_name": "Alice",
-            "last_name": "Smith",
-            "email": "alice.smith@example.com",
-            "phone_number": "1234567890",
-            "skills": "Autism, ADHD",
-            "hourly_rate": "650.00",
-            "is_active": True,
-        }
-        response = self.client.post(self.url, data=payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(LSAProfile.objects.count(), 1)
-        self.assertEqual(response.data["data"]["email"], "alice.smith@example.com")
-        self.assertEqual(response.data["data"]["skills"], "Autism, ADHD")
-

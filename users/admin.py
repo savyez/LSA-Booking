@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Parent, LSAProfile
+from .models import Parent, LSAProfile, Skill
 from bookings.models import Booking
 
 
@@ -19,6 +19,12 @@ class LSABookingInline(admin.TabularInline):
     show_change_link = True
 
 
+@admin.register(Skill)
+class SkillAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_at')
+    search_fields = ('name',)
+
+
 @admin.register(Parent)
 class ParentAdmin(admin.ModelAdmin):
     list_display = ('id', 'first_name', 'last_name', 'email', 'phone_number', 'created_at')
@@ -31,6 +37,6 @@ class ParentAdmin(admin.ModelAdmin):
 class LSAProfileAdmin(admin.ModelAdmin):
     list_display = ('id', 'first_name', 'last_name', 'email', 'phone_number', 'hourly_rate', 'is_active', 'created_at')
     list_filter = ('is_active', 'created_at')
-    search_fields = ('first_name', 'last_name', 'email', 'phone_number', 'skills')
+    search_fields = ('first_name', 'last_name', 'email', 'phone_number', 'skills__name')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [LSABookingInline]

@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 import uuid
 from users.models import Parent, LSAProfile
 
@@ -44,8 +45,8 @@ class Booking(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(end_time__gt=models.F("start_time")),
-                name="booking_end_after_start",
+                condition=~models.Q(start_time=models.F("end_time")),
+                name="booking_end_not_equal_start",
             )
         ]
 
@@ -64,28 +65,66 @@ class Booking(models.Model):
         """
         super().clean()
 
-        if self.start_time and self.end_time and self.start_time >= self.end_time:
-            raise ValidationError("End time must be after start time.")
+        if self.start_time and self.end_time and self.start_time == self.end_time:
+            raise ValidationError("Start time and end time cannot be equal.")
+
+        if self.booking_date and self.start_time:
+            now = timezone.localtime()
+            today = now.date()
+            now_time = now.time()
+            if self.booking_date < today or (self.booking_date == today and self.start_time < now_time):
+                raise ValidationError(
+                    {"booking_date": "Booking date and time cannot be in the past."}
+                )
 
         if not (self.lsa_id and self.booking_date and self.start_time and self.end_time):
             return
 
-        overlapping = self.__class__.objects.filter(
+        start_dt = datetime.combine(self.booking_date, self.start_time)
+        end_dt = datetime.combine(self.booking_date, self.end_time)
+        if self.end_time <= self.start_time:
+            end_dt += timedelta(days=1)
+
+        candidates = self.__class__.objects.filter(
             lsa_id=self.lsa_id,
-            booking_date=self.booking_date,
+            booking_date__range=[self.booking_date - timedelta(days=1), self.booking_date + timedelta(days=1)],
             status__in=self.BLOCKING_STATUSES,
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
         ).exclude(pk=self.pk)
 
-        if overlapping.exists():
-            raise ValidationError(
-                {
-                    "__all__": (
-                        "This LSA already has a booking during the selected time."
+        for b in candidates:
+            b_start = datetime.combine(b.booking_date, b.start_time)
+            b_end = datetime.combine(b.booking_date, b.end_time)
+            if b.end_time <= b.start_time:
+                b_end += timedelta(days=1)
+            if b_start < end_dt and b_end > start_dt:
+                raise ValidationError(
+                    {
+                        "__all__": (
+                            "This LSA already has a booking during the selected time."
+                        )
+                    }
+                )
+
+        if self.parent_id:
+            parent_candidates = self.__class__.objects.filter(
+                parent_id=self.parent_id,
+                booking_date__range=[self.booking_date - timedelta(days=1), self.booking_date + timedelta(days=1)],
+                status__in=self.BLOCKING_STATUSES,
+            ).exclude(pk=self.pk)
+
+            for b in parent_candidates:
+                b_start = datetime.combine(b.booking_date, b.start_time)
+                b_end = datetime.combine(b.booking_date, b.end_time)
+                if b.end_time <= b.start_time:
+                    b_end += timedelta(days=1)
+                if b_start < end_dt and b_end > start_dt:
+                    raise ValidationError(
+                        {
+                            "__all__": (
+                                "You already have another booking during the selected time."
+                            )
+                        }
                     )
-                }
-            )
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -97,6 +136,8 @@ class Booking(models.Model):
             return Decimal("0.00")
         start_dt = datetime.combine(self.booking_date, self.start_time)
         end_dt = datetime.combine(self.booking_date, self.end_time)
+        if self.end_time <= self.start_time:
+            end_dt += timedelta(days=1)
         seconds = (end_dt - start_dt).total_seconds()
         return Decimal(str(seconds / 3600))
 
