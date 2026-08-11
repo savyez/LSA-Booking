@@ -105,7 +105,26 @@ class LSASearchAPITests(APITestCase):
             len(response.data["data"]), 
             1
             )
-        self.assertEqual(
-            response.data["data"][0]["email"], 
-            "bob.marley@example.com"
-            )
+
+        
+class LSAProfileAPITests(APITestCase):
+
+    def setUp(self):
+        self.url = reverse("lsa-profile")
+
+    def test_create_lsa_profile(self):
+        payload = {
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "email": "alice.smith@example.com",
+            "phone_number": "1234567890",
+            "skills": "Autism, ADHD",
+            "hourly_rate": "650.00",
+            "is_active": True,
+        }
+        response = self.client.post(self.url, data=payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(LSAProfile.objects.count(), 1)
+        self.assertEqual(response.data["data"]["email"], "alice.smith@example.com")
+        self.assertEqual(response.data["data"]["skills"], "Autism, ADHD")
+

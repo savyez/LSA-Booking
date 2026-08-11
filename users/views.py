@@ -25,6 +25,28 @@ class ParentView(APIView):
         )
 
 
+class LSAProfileView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = LSAProfileSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "message": "LSA Profile created successfully!",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
 class LSASearchView(APIView):
 
     permission_classes = [AllowAny]
@@ -45,4 +67,4 @@ class LSASearchView(APIView):
         return Response({
             "message": f"Found {count} LSAs!",
             "data": serializer.data,
-        },status=status.HTTP_200_OK)
+        }, status=status.HTTP_200_OK)
