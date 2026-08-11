@@ -1,11 +1,13 @@
 # HABOT LSA Booking System Backend
 
-A robust, enterprise-grade Django REST Framework (DRF) backend designed to connect Parents with **Learning Support Assistants (LSAs)**. It features concurrency-safe session scheduling, double-booking prevention, payment initiation, mock payment gateway simulation, and asynchronous webhook handling.
+A robust, enterprise-grade Django REST Framework (DRF) backend microservice designed to connect Parents with **Learning Support Assistants (LSAs)**. It features concurrency-safe session scheduling, double-booking prevention, multi-hour billing, normalized skill searching, payment gateway integration, modular settings environment separation, and automated CI/CD.
 
 ---
 
-## 📖 Documentation Links
+## 📖 Documentation & Diagram Links
 - 🔌 **[APIs.md - REST API Specification](APIs.md)**: Exhaustive documentation of all REST endpoints, request payloads, response schemas, and status codes.
+- 🗺️ **[ER Diagram](ER-Diagram.png)**: Visual database schema diagram showing model relationships.
+- ⚙️ **[CI/CD Workflow](.github/workflows/test.yml)**: GitHub Actions continuous integration pipeline configuration.
 
 ---
 
@@ -15,86 +17,36 @@ A robust, enterprise-grade Django REST Framework (DRF) backend designed to conne
 
 ---
 
-## 🏗️ Architectural Design Choices (MVC vs. MVT)
+## 📁 Modular Settings Package Structure
 
-### Django MVT vs. DRF Decoupled MVC
-Traditional Django applications follow the **Model-View-Template (MVT)** architecture:
-- **Model**: Database layer & ORM schema.
-- **View**: Executes business logic and fetches model data.
-- **Template**: Renders HTML/CSS templates on the server side to present the UI.
-
-In **HABOT-Backend**, because we are building a headless RESTful API microservice to serve frontend applications (web/mobile), we adapted Django's structure into a **Model-View-Controller (MVC)** design pattern:
+The Django configuration has been separated into a modular settings package (`config/settings/`):
 
 ```text
- Client (Web/Mobile App)
-        │
-        │ HTTP Request (JSON)
-        ▼
-   [ Controller ]   ──►  Django REST Framework APIViews (`views.py`)
-        │                - Handles HTTP routing, headers, permissions
-        │                - Controls transaction scope (`transaction.atomic()`)
-        ▼
-   [ Serializer ]   ──►  DRF ModelSerializers (`serializers.py`)
-        │                - Input sanitization & field-level validation
-        │                - DTO transformation (Model ⇄ JSON)
-        ▼
-     [ Model ]      ──►  Django ORM Models (`models.py`)
-        │                - Business constraints & database storage
-        ▼
-  PostgreSQL / DB
+config/
+├── settings/
+│   ├── __init__.py      # Environment selector (loads local.py or production.py based on DJANGO_ENV)
+│   ├── base.py          # Shared base settings (installed apps, middleware, REST framework, i18n)
+│   ├── local.py         # Local development configuration (DEBUG=True, localhost DB/hosts)
+│   └── production.py    # Production configuration (DEBUG=False, strict security headers)
+├── urls.py              # Root API URL routing (/api/v1/)
+├── wsgi.py              # WSGI entrypoint
+└── asgi.py              # ASGI entrypoint
 ```
 
-1. **Model (M)**: Django ORM classes ([`users/models.py`](users/models.py), [`bookings/models.py`](bookings/models.py), [`payments/models.py`](payments/models.py)) define relational tables, indexes, and validation rules (`clean()`).
-2. **Controller (C)**: Class-based `APIView` components ([`views.py`](bookings/views.py)) act as Controllers. They handle request lifecycle, authorization (`AllowAny`/`IsAuthenticated`), execute database transactions, handle errors, and formulate HTTP JSON responses instead of rendering HTML templates.
-3. **Serializer / Data Layer**: DRF Serializers replace server-side templates by acting as Data Transfer Objects (DTOs) and validation schemas.
-
----
-
-## 🔒 Concurrency & Double-Booking Prevention
-
-To meet strict booking requirements and prevent two parents from booking the same LSA for overlapping time slots during high concurrency:
-- **Row-Level Locking (`select_for_update()`)**: When a booking request is initiated, the targeted `LSAProfile` row is locked in the database within a `transaction.atomic()` block.
-- **Atomic Slot Validation**: Overlap validation runs while holding the lock, ensuring concurrent requests wait and evaluate against already-committed slot reservations.
-- **HTTP 409 Conflict**: If an overlap is detected, the system safely rolls back and returns an HTTP `409 Conflict` status.
-
----
-
-## 📁 Project Structure
-
-```text
-habot-backend/
-├── config/             # Project configuration & root URL routing
-│   ├── settings.py     # Environment variables, installed apps, database config
-│   └── urls.py         # Root endpoint routing under /api/v1/
-├── users/              # Parent & LSA Profile management
-│   ├── models.py       # Parent & LSAProfile ORM models
-│   ├── views.py        # Parent registration & active LSA skill search
-│   ├── serializers.py  # DRF serializers for user entities
-│   └── tests.py        # Unit tests for users app
-├── bookings/           # Concurrency-safe session booking
-│   ├── models.py       # Booking model with overlap validation logic
-│   ├── views.py        # BookingView with select_for_update() locks
-│   ├── serializers.py  # BookingSerializer
-│   └── tests.py        # Unit tests for booking creation & overlap checks
-├── payments/           # Payment initiation & webhook processing
-│   ├── models.py       # Payment model (PENDING, SUCCESS, FAILED)
-│   ├── views.py        # Payment initiation, mock gateway, & webhook API
-│   ├── services.py     # HTTP service client for gateway requests
-│   ├── serializers.py  # PaymentSerializer
-│   └── tests.py        # Unit & mocked integration tests for payments
-├── APIs.md             # Detailed REST API Documentation
-├── README.md           # Technical project documentation
-├── requirements.txt    # Python dependencies
-└── manage.py           # Django management CLI
+### Settings Import & Resolution
+All application code accesses runtime configuration using Django's standard dynamic configuration proxy:
+```python
+from django.conf import settings
 ```
+Entrypoints (`manage.py`, `wsgi.py`, `asgi.py`) set `DJANGO_SETTINGS_MODULE='config.settings'`, delegating setting imports to [`config/settings/__init__.py`](config/settings/__init__.py) which dynamically selects `local` or `production` based on the `DJANGO_ENV` environment variable.
 
 ---
 
-## 🚀 Setup & Installation Instructions
+## 🚀 Quick Setup & Installation Instructions
 
 ### Prerequisites
-- **Python**: Version `3.12+`
-- **Database**: PostgreSQL (recommended for production) or SQLite (for development)
+- **Python**: `3.11+` or `3.12+`
+- **Database**: PostgreSQL (Production) or SQLite (Local Development)
 
 ### 1. Clone & Setup Virtual Environment
 ```bash
@@ -105,9 +57,9 @@ cd LSA-Booking
 python -m venv .venv
 
 # Activate virtual environment
-# On Windows:
+# Windows (PowerShell / CMD):
 .venv\Scripts\activate
-# On Linux/macOS:
+# Linux / macOS:
 source .venv/bin/activate
 ```
 
@@ -122,12 +74,15 @@ Copy `.env.example` to create `.env`:
 cp .env.example .env
 ```
 
-Configure your `.env` variables:
+Set environment variables in `.env`:
 ```env
-DJANGO_SECRET_KEY=your-custom-secret-key
+DJANGO_SECRET_KEY='your-custom-django-secret-key'
 DEBUG=True
-ALLOWED_HOSTS=127.0.0.1,localhost
-DB_NAME=your-DB-name
+ALLOWED_HOSTS=127.0.0.1,localhost,testserver
+DJANGO_ENV=local  # Loads config/settings/local.py (use 'production' for prod)
+
+# DB Settings (PostgreSQL or SQLite fallback)
+DB_NAME=habot_db
 DB_USER=postgres
 DB_PASS=your-password
 DB_HOST=127.0.0.1
@@ -135,7 +90,7 @@ DB_PORT=5432
 ```
 
 ### 4. Database Migrations
-Run Django migrations to build database tables and indexes:
+Run Django migrations to build normalized tables, constraints, and indexes:
 ```bash
 python manage.py migrate
 ```
@@ -148,33 +103,102 @@ The REST API root will be accessible at: `http://127.0.0.1:8000/api/v1/`
 
 ---
 
-## 🧪 Testing
+## 🏛️ Architecture & Key Design Decisions
 
-Execute the test suite using Django's test runner:
-
-```bash
-# Run complete test suite
-python manage.py test
-
-# Run tests for specific apps
-python manage.py test users
-python manage.py test bookings
-python manage.py test payments
+### 1. Decoupled REST Microservice (DRF Controller Pattern)
+Instead of traditional Django MVT (Model-View-Template) server-rendered HTML, this project implements a headless RESTful architecture:
+```text
+  Client (Web / Mobile)
+        │
+        │ HTTP JSON Request
+        ▼
+   [ Controller ]   ──► DRF APIViews (`views.py`)
+        │               - Handles HTTP Routing & Status Codes
+        │               - Atomic Database Transactions (`transaction.atomic()`)
+        ▼
+   [ Serializer ]   ──► DRF ModelSerializers (`serializers.py`)
+        │               - Input Sanitization & Validation DTOs
+        ▼
+     [ Model ]      ──► Django ORM Models (`models.py`)
+        │               - Relational Constraints & Overlap Rules
+        ▼
+  PostgreSQL / DB
 ```
+
+### 2. Concurrency-Safe Double-Booking Prevention
+To prevent two parents from booking the same LSA for overlapping slots during high concurrency:
+- **Row-Level Locking (`select_for_update()`)**: When a booking request arrives, the `LSAProfile` record is locked within a `with transaction.atomic():` block.
+- **Overlapping Slot Evaluation**: Overlaps are checked against active statuses (`PENDING`, `CONFIRMED`) while holding the lock.
+- **Parent Conflict Validation**: Evaluates schedule conflicts for both the LSA and the Parent.
+- **HTTP 409 Conflict**: Returns HTTP 409 Conflict if an overlap is detected, preventing double-bookings.
+
+### 3. Single-Threaded HTTP Loopback Deadlock Avoidance
+- In single-threaded development servers (`manage.py runserver`), calling an external HTTP endpoint on the same process causes deadlocks.
+- `payments/services.py` detects local gateway URLs (`127.0.0.1` / `localhost`) and routes calls in-process via `django.urls.resolve()` and `APIRequestFactory`, eliminating HTTP socket deadlocks.
 
 ---
 
-## 📑 API Overview Quick Reference
+## 🗄️ Database & Query Performance Decisions
 
-Refer to **[APIs.md](APIs.md)** for exhaustive payload specs.
+1. **Normalized Skills Schema (`Skill` Model & `ManyToManyField`)**:
+   - Replaced un-indexed `TextField` comma-separated strings (`skills__icontains=skill`) that caused full-table SQL `LIKE '%skill%'` scans.
+   - Introduced a `Skill` model with `unique=True` and `db_index=True`, linked via `ManyToManyField`.
+   - Search queries use `.prefetch_related("skills")` and exact indexed lookups (`skills__name__iexact=skill`).
 
-| Module | Method | Endpoint | Description |
+2. **Overnight Midnight-Spanning Sessions**:
+   - `Booking.duration_hours` dynamically calculates duration for sessions crossing midnight (e.g. 23:00 to 01:00 = 2.0 hours).
+   - Replaced restrictive same-day DB constraints with `booking_end_not_equal_start` (`CheckConstraint`), disallowing 0-duration sessions while enabling overnight bookings.
+
+3. **Database Indexing**:
+   - Added DB indexes on frequently filtered fields: `booking_date`, `status`, `email`, `is_active`, and composite index `(lsa, booking_date)`.
+
+---
+
+## 📑 REST API Endpoint Summary
+
+Refer to **[APIs.md](APIs.md)** for detailed request payloads and JSON response examples.
+
+| Module | HTTP Method | Endpoint | Description |
 | :--- | :--- | :--- | :--- |
-| **Users** | `POST` | `/api/v1/parents/` | Create Parent Profile |
-| **Users** | `POST` | `/api/v1/lsas/` | Create LSA Profile |
-| **Users** | `GET` | `/api/v1/lsas/search/` | Search Active LSAs by skill (`?skill=...`) |
-| **Bookings** | `POST` | `/api/v1/bookings/` | Create Booking (concurrency-safe) |
-| **Payments** | `POST` | `/api/v1/payments/` | Initiate Payment for a booking |
-| **Payments** | `POST` | `/api/v1/payments/mock-gateway/` | Mock Payment Gateway endpoint |
-| **Payments** | `POST` | `/api/v1/payments/webhook/` | Asynchronous Payment Webhook callback |
+| **Users** | `POST` | `/api/v1/parents/` | Register Parent Profile |
+| **Users** | `POST` | `/api/v1/lsas/` | Register LSA Profile |
+| **Users** | `GET` | `/api/v1/lsas/search/` | Search Active LSAs by skill & availability |
+| **Bookings** | `POST` | `/api/v1/bookings/` | Create Booking (concurrency-locked) |
+| **Payments** | `POST` | `/api/v1/payments/` | Initiate Payment (calculated by duration) |
+| **Payments** | `POST` | `/api/v1/payments/mock-gateway/` | Mock Payment Gateway Simulation |
+| **Payments** | `POST` | `/api/v1/payments/webhook/` | Asynchronous Payment Webhook Callback |
 
+---
+
+## 🧪 Testing Suite
+
+Execute the integration test suite using Django's test runner:
+
+```bash
+# Run full automated test suite
+python manage.py test
+
+# Run app-specific tests
+python manage.py test bookings
+python manage.py test payments
+python manage.py test users
+```
+
+### Test Coverage Highlights
+- **`BookingAPITestCase`**: Tests booking creation, overlap conflict detection (409 Conflict), and overnight session calculations.
+- **`PaymentAPITestCase`**: Tests multi-hour calculation billing, gateway failure atomic rollback and retries, and webhook handling.
+- **`LSASearchAPITestCase`**: Tests normalized skill search and slot availability filtering.
+
+---
+
+## ⚙️ Continuous Integration (CI/CD)
+
+Continuous integration is automated via GitHub Actions in [`.github/workflows/test.yml`](.github/workflows/test.yml).
+
+### CI Pipeline Workflow
+- **Service Container**: Spins up a containerized PostgreSQL 15 database (`postgres:15-alpine`) with health checks (`pg_isready`).
+- **Python Setup**: Uses Python 3.11 with `pip` dependency caching.
+- **Automated Execution**:
+  1. Installs dependencies from `requirements.txt`.
+  2. Executes database migrations (`python manage.py migrate`).
+  3. Runs full unit and integration test suite (`python manage.py test`).
