@@ -59,10 +59,10 @@ class LSASearchView(APIView):
         start_time = request.query_params.get("start_time")
         end_time = request.query_params.get("end_time")
 
-        queryset = LSAProfile.objects.filter(is_active=True).prefetch_related("skills")
+        queryset = LSAProfile.objects.filter(is_active=True)
         if skill:
             queryset = queryset.filter(
-                skills__name__iexact=skill.strip()
+                skills__name__icontains=skill.strip()
             ).distinct()
 
         if booking_date and start_time and end_time:
@@ -94,6 +94,7 @@ class LSASearchView(APIView):
             except ValueError:
                 pass
 
+        queryset = queryset.prefetch_related("skills")
         count = queryset.count()
         serializer = LSAProfileSerializer(
             queryset,

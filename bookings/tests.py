@@ -100,3 +100,25 @@ class BookingAPITestCase(APITestCase):
             booking.total_amount, 
         Decimal("1300.00")
         )
+
+    def test_booking_admin_list_select_related(self):
+        from bookings.admin import BookingAdmin
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from django.contrib.auth.models import User
+
+        for i in range(5):
+            parent = Parent.objects.create(first_name=f"Parent{i}", last_name="Test", email=f"p{i}@example.com")
+            lsa = LSAProfile.objects.create(first_name=f"LSA{i}", last_name="Test", email=f"lsa{i}@example.com")
+            Booking.objects.create(parent=parent, lsa=lsa, booking_date="2026-09-01", start_time="10:00", end_time="12:00")
+
+        admin_site = AdminSite()
+        admin_obj = BookingAdmin(Booking, admin_site)
+        rf = RequestFactory()
+        request = rf.get("/admin/bookings/booking/")
+        request.user = User.objects.create_superuser("admin", "admin@example.com", "password")
+
+        qs = admin_obj.get_queryset(request)
+        self.assertTrue(qs.query.select_related)
+        self.assertIn("parent", qs.query.select_related)
+        self.assertIn("lsa", qs.query.select_related)

@@ -14,9 +14,13 @@ class PaymentInline(admin.TabularInline):
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
     list_display = ('id', 'parent', 'lsa', 'booking_date', 'start_time', 'end_time', 'status', 'created_at')
+    list_select_related = ('parent', 'lsa')
     list_filter = ('status', 'booking_date')
     list_editable = ('status',)
     search_fields = ('id', 'parent__first_name', 'parent__last_name', 'parent__email', 'lsa__first_name', 'lsa__last_name', 'lsa__email')
     date_hierarchy = 'booking_date'
     readonly_fields = ('created_at', 'updated_at')
     inlines = [PaymentInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('parent', 'lsa')

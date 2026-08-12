@@ -10,6 +10,9 @@ class ParentBookingInline(admin.TabularInline):
     readonly_fields = ('id', 'lsa', 'booking_date', 'start_time', 'end_time', 'status')
     show_change_link = True
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('lsa')
+
 
 class LSABookingInline(admin.TabularInline):
     model = Booking
@@ -17,6 +20,9 @@ class LSABookingInline(admin.TabularInline):
     fields = ('id', 'parent', 'booking_date', 'start_time', 'end_time', 'status')
     readonly_fields = ('id', 'parent', 'booking_date', 'start_time', 'end_time', 'status')
     show_change_link = True
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('parent')
 
 
 @admin.register(Skill)

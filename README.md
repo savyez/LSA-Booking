@@ -1,5 +1,11 @@
 # HABOT LSA Booking System Backend
 
+**Author / Candidate:** Savyez  
+**Contact Email:** visnuk252@gmail.com  
+**Repository:** [https://github.com/savyez/LSA-Booking](https://github.com/savyez/LSA-Booking)  
+
+---
+
 A robust, enterprise-grade Django REST Framework (DRF) backend microservice designed to connect Parents with **Learning Support Assistants (LSAs)**. It features concurrency-safe session scheduling, double-booking prevention, multi-hour billing, normalized skill searching, payment gateway integration, modular settings environment separation, and automated CI/CD.
 
 ---
@@ -45,8 +51,8 @@ Entrypoints (`manage.py`, `wsgi.py`, `asgi.py`) set `DJANGO_SETTINGS_MODULE='con
 ## 🚀 Quick Setup & Installation Instructions
 
 ### Prerequisites
-- **Python**: `3.11+` or `3.12+`
-- **Database**: PostgreSQL (Production) or SQLite (Local Development)
+- **Python**: `3.12`
+- **Database**: PostgreSQL 17 (Production / CI) or SQLite (Local Development)
 
 ### 1. Clone & Setup Virtual Environment
 ```bash
@@ -143,7 +149,7 @@ To prevent two parents from booking the same LSA for overlapping slots during hi
 1. **Normalized Skills Schema (`Skill` Model & `ManyToManyField`)**:
    - Replaced un-indexed `TextField` comma-separated strings (`skills__icontains=skill`) that caused full-table SQL `LIKE '%skill%'` scans.
    - Introduced a `Skill` model with `unique=True` and `db_index=True`, linked via `ManyToManyField`.
-   - Search queries use `.prefetch_related("skills")` and exact indexed lookups (`skills__name__iexact=skill`).
+   - Search queries use `.prefetch_related("skills")` and case-insensitive substring lookups (`skills__name__icontains=skill`).
 
 2. **Overnight Midnight-Spanning Sessions**:
    - `Booking.duration_hours` dynamically calculates duration for sessions crossing midnight (e.g. 23:00 to 01:00 = 2.0 hours).
@@ -196,8 +202,8 @@ python manage.py test users
 Continuous integration is automated via GitHub Actions in [`.github/workflows/test.yml`](.github/workflows/test.yml).
 
 ### CI Pipeline Workflow
-- **Service Container**: Spins up a containerized PostgreSQL 15 database (`postgres:15-alpine`) with health checks (`pg_isready`).
-- **Python Setup**: Uses Python 3.11 with `pip` dependency caching.
+- **Service Container**: Spins up a containerized PostgreSQL 17 database (`postgres:17-alpine`) with health checks (`pg_isready`).
+- **Python Setup**: Uses Python 3.12 with `pip` dependency caching.
 - **Automated Execution**:
   1. Installs dependencies from `requirements.txt`.
   2. Executes database migrations (`python manage.py migrate`).

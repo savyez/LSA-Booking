@@ -125,3 +125,19 @@ class PaymentAPITestCase(APITestCase):
             self.booking.status, 
         Booking.Status.CONFIRMED
         )
+
+    def test_payment_admin_list_select_related(self):
+        from payments.admin import PaymentAdmin
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from django.contrib.auth.models import User
+
+        admin_site = AdminSite()
+        admin_obj = PaymentAdmin(Payment, admin_site)
+        rf = RequestFactory()
+        request = rf.get("/admin/payments/payment/")
+        request.user = User.objects.create_superuser("admin", "admin@example.com", "password")
+
+        qs = admin_obj.get_queryset(request)
+        self.assertTrue(qs.query.select_related)
+        self.assertIn("booking", qs.query.select_related)

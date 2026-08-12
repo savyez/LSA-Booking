@@ -76,8 +76,21 @@ class LSAProfile(models.Model):
             names = [str(s).strip() for s in skills_raw if str(s).strip()]
         else:
             names = []
-        objs = [Skill.objects.get_or_create(name=name)[0] for name in names]
-        self.skills.set(objs)
+        if not names:
+            self.skills.clear()
+            return
+
+        unique_names = list(dict.fromkeys(names))
+        existing = {s.name: s for s in Skill.objects.filter(name__in=unique_names)}
+        missing_names = [n for n in unique_names if n not in existing]
+
+        if missing_names:
+            Skill.objects.bulk_create([Skill(name=n) for n in missing_names], ignore_conflicts=True)
+            skills = list(Skill.objects.filter(name__in=unique_names))
+        else:
+            skills = list(existing.values())
+
+        self.skills.set(skills)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

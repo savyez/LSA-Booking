@@ -1,5 +1,9 @@
 # API Documentation
 
+**Author / Candidate:** Savyez  
+**Contact Email:** visnuk252@gmail.com  
+**Repository:** [https://github.com/savyez/LSA-Booking](https://github.com/savyez/LSA-Booking)  
+
 Base URL: `/api/v1/`
 
 ---
@@ -115,7 +119,7 @@ Creates a new Learning Support Assistant (LSA) profile in the system.
 ---
 
 ### 3. Search Active LSA Profiles
-Searches for active Learning Support Assistant (LSA) profiles, with optional filtering by skill.
+Searches for active Learning Support Assistant (LSA) profiles, with optional filtering by skill and date/time slot availability.
 
 - **Endpoint**: `/api/v1/lsas/search/`
 - **Method**: `GET`
@@ -125,10 +129,15 @@ Searches for active Learning Support Assistant (LSA) profiles, with optional fil
 #### Query Parameters
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `skill` | string | No | Case-insensitive substring query to filter LSA skills (e.g. `adhd`, `autism`) |
+| `skill` | string | No | Case-insensitive substring query to filter LSA skills (e.g. `adhd`, `adh`, `autism`) |
+| `booking_date` | string (YYYY-MM-DD) | No | Target date for checking LSA schedule availability |
+| `start_time` | string (HH:MM / HH:MM:SS) | No | Desired session start time (used together with `booking_date` and `end_time`) |
+| `end_time` | string (HH:MM / HH:MM:SS) | No | Desired session end time (used together with `booking_date` and `start_time`) |
 
-#### Example Request
-`GET /api/v1/lsas/search/?skill=adhd`
+#### Example Requests
+- **Skill Substring Search**: `GET /api/v1/lsas/search/?skill=adh`
+- **Availability Filtering**: `GET /api/v1/lsas/search/?booking_date=2026-08-15&start_time=10:00&end_time=12:00`
+- **Combined Search**: `GET /api/v1/lsas/search/?skill=adhd&booking_date=2026-08-15&start_time=10:00&end_time=12:00`
 
 #### Response (200 OK)
 ```json
